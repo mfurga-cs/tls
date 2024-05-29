@@ -21,9 +21,16 @@ def parse_tls_handshake(data: bytes):
   version = reader.read_u16()
   length = reader.read_u16()
 
-  # parse handshare header
+  # parse handshake header
   handshake = Handshake.from_bytes(reader.read_bytes(length))
   print(handshake)
+
+  data = data[5:]
+  data2 = handshake.to_bytes()
+
+  print(len(data))
+  print(len(data2))
+  print(data == data2)
 
 def main() -> None:
   with open("samples/client_hello.bin", "rb") as f:

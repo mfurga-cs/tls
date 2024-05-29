@@ -5,30 +5,7 @@ from enum import Enum
 from typing import List
 
 from cipher_suites import CipherSuite
-
-class ByteReader:
-  def __init__(self, data: bytes) -> None:
-    self.data = data
-
-  def read_u8(self) -> int:
-    v = struct.unpack(">B", self.data[:1])[0]
-    self.data = self.data[1:]
-    return v
-
-  def read_u16(self) -> int:
-    v = struct.unpack(">H", self.data[:2])[0]
-    self.data = self.data[2:]
-    return v
-
-  def read_u24(self) -> int:
-    v = struct.unpack(">I", b"\x00" + self.data[:3])[0]
-    self.data = self.data[3:]
-    return v
-
-  def read_bytes(self, len: int) -> bytes:
-    v = self.data[:len]
-    self.data = self.data[len:]
-    return v
+from utils import ByteReader, ByteWriter
 
 class HandshakeType(Enum):
   HELLO_REQUEST = 0x00
@@ -54,7 +31,7 @@ class Handshake:
                session_id: bytes,
                cipher_suites: List[CipherSuite],
                compression_methods: List[int],
-               extensiones: bytes
+               extensions: bytes
                ):
     self.type = type
     self.length = length
@@ -63,7 +40,7 @@ class Handshake:
     self.session_id = session_id
     self.cipher_suites = cipher_suites
     self.compression_methods = compression_methods
-    self.extensions = extensiones
+    self.extensions = extensions
 
   @classmethod
   def from_bytes(cls, data: bytes):
@@ -85,6 +62,8 @@ class Handshake:
 
     compression_methods_len = reader.read_u8()
     compression_methods = list(reader.read_bytes(compression_methods_len))
+
+    # TODO: Parse extenstions
     extensions_len = reader.read_u16()
     extensions = reader.read_bytes(extensions_len)
 
@@ -92,12 +71,46 @@ class Handshake:
                compression_methods, extensions)
 
   def to_bytes(self) -> bytes:
-    # TODO
-    pass
+    writer = ByteWriter()
+
+    writer.write_u8(self.type.value)
+    writer.write_u24(self.length)
+    writer.write_u16(self.version)
+
+    assert len(self.random) == 32
+    writer.write_bytes(self.random)
+
+    session_id_len = len(self.session_id) * 1
+    session_id = bytes(self.session_id)
+    assert len(session_id) == session_id_len
+    writer.write_u8(session_id_len)
+    writer.write_bytes(session_id)
+
+    cipher_suites_len = len(self.cipher_suites) * 2
+    cipher_suites = bytes.join(b"", [
+      cs.value.to_bytes(2, "big") for cs in self.cipher_suites
+    ])
+    assert len(cipher_suites) == cipher_suites_len
+    writer.write_u16(cipher_suites_len)
+    writer.write_bytes(cipher_suites)
+
+    compression_methods_len = len(self.compression_methods) * 1
+    compression_methods = bytes(self.compression_methods)
+    assert len(compression_methods) == compression_methods_len
+    writer.write_u8(compression_methods_len)
+    writer.write_bytes(compression_methods)
+
+    extensions_len = len(self.extensions)
+    extensions = self.extensions
+    assert len(extensions) == extensions_len
+    writer.write_u16(extensions_len)
+    data = writer.write_bytes(extensions)
+
+    return data
 
   def __str__(self) -> str:
     s = []
-    s.append("Handshake")
+    s.append("** Handshake **")
     s.append(f"Type       : {self.type.name}")
     s.append(f"Length     : {self.length}")
     s.append(f"Version    : 0x{self.version:04x}")
