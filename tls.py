@@ -57,8 +57,10 @@ class HandshakeExtension:
 
   def __str__(self) -> str:
     s = []
-    s.append(f"Type : {self.type:04x}\tLength : {self.length}\tData : 0x{self.data[:8].hex()} ...")
-    return "\n".join(s)
+    s.append(f"Type : {self.type:04x}")
+    s.append(f"Length : {self.length}")
+    s.append(f"Data : 0x{self.data[:8].hex()} ...")
+    return "\t".join(s)
 
 class Handshake:
   def __init__(self,
