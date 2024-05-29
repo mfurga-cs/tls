@@ -111,10 +111,8 @@ class Handshake:
 
     compression_methods = list(reader.read_bytes(compression_methods_len))
 
-    # TODO: Parse extenstions
     extensions_len = reader.read_u16()
     extensions = reader.read_bytes(extensions_len)
-
     exts = []
     while len(extensions) > 0:
       extension = HandshakeExtension.from_bytes(extensions)
