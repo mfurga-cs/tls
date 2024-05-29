@@ -46,3 +46,6 @@ class ByteWriter:
     self.data += v
     return self.data
 
+  def __len__(self) -> int:
+    return len(self.data)
+
