@@ -50,7 +50,7 @@ class HandshakeExtension:
 
     return cls(type, data)
 
-  def to_bytes(self) -> bytes():
+  def to_bytes(self) -> bytes:
     writer = ByteWriter()
 
     writer.write_u16(self.type)
@@ -68,6 +68,33 @@ class HandshakeExtension:
     s.append(f"Type : {self.type:04x}")
     s.append(f"Length : {self.length}")
     s.append(f"Data : 0x{self.data[:8].hex()} ...")
+    return "\t".join(s)
+
+
+class KeyShareEntry:
+  def __init__(self, group: int, key: bytes):
+    self.group = group
+    self.key = key
+
+  @property
+  def length(self):
+    return len(self.key)
+
+  def to_bytes(self) -> bytes:
+    writer = ByteWriter()
+
+    writer.write_u16(self.group)
+    writer.write_u16(self.length)
+    assert self.length == len(self.key)
+    data = writer.write_bytes(self.key)
+
+    return data
+
+  def __str__(self) -> str:
+    s = []
+    s.append(f"Group : {self.group:04x}")
+    s.append(f"Length : {self.length}")
+    s.append(f"Key : 0x{self.key[:8].hex()} ...")
     return "\t".join(s)
 
 

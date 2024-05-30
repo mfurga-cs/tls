@@ -4,7 +4,13 @@ import socket
 import struct
 from random import randbytes
 
-from tls import Handshake, HandshakeType, HandshakeVersion, HandshakeExtension
+from tls import (
+  Handshake,
+  HandshakeType,
+  HandshakeVersion,
+  HandshakeExtension,
+  KeyShareEntry
+)
 from record import Record, RecordContentType, RecordVersion
 from cipher_suites import CipherSuite
 
@@ -27,9 +33,13 @@ def main() -> None:
 
     # client hello
     record = Record.from_bytes(data)
+    print(record)
+
     if record.content_type == RecordContentType.HANDSHAKE:
       handshake = Handshake.from_bytes(record.data)
       print(handshake)
+
+    key = KeyShareEntry(group=29, key=randbytes(32))
 
     # server hello
     server_hello = Handshake(
@@ -40,8 +50,8 @@ def main() -> None:
       cipher_suites=[CipherSuite.TLS_AES_256_GCM_SHA384],
       compression_methods=[0],
       extensions=[
-        HandshakeExtension(type=43, data=b"\x03\x04"),   # supported_versions: TLS 1.3
-        HandshakeExtension(type=51, data=randbytes(32)), # key_share: ...
+        HandshakeExtension(type=43, data=b"\x03\x04"),    # supported_versions: TLS 1.3
+        HandshakeExtension(type=51, data=key.to_bytes()), # key_share: x25519
       ]
     )
 
