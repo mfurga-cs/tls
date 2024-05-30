@@ -1,14 +1,14 @@
 # https://tls13.xargs.org/
 
 import struct
-from enum import Enum
+from enum import IntEnum
 from typing import List
 
 from cipher_suites import CipherSuite
 from utils import ByteReader, ByteWriter
 
 
-class HandshakeType(Enum):
+class HandshakeType(IntEnum):
   HELLO_REQUEST = 0x00
   CLIENT_HELLO = 0x01
   SERVER_HELLO = 0x02
@@ -24,14 +24,95 @@ class HandshakeType(Enum):
   CERTIFICATE_STATUS = 0x16
 
 
-class HandshakeVersion(Enum):
+class HandshakeVersion(IntEnum):
+  TLS_1 = 0x0301
+  TLS_1_1 = 0x0302
   TLS_1_2 = 0x0303
+  TLS_1_3 = 0x0304
+
+
+class HandshakeExtensionType(IntEnum):
+  SERVER_NAME = 0
+  MAX_FRAGMENT_LENGTH = 1
+  CLIENT_CERTIFICATE_URL = 2
+  TRUSTED_CA_KEYS = 3
+  TRUNCATED_HMAC = 4
+  STATUS_REQUEST = 5
+  USER_MAPPING = 6
+  CLIENT_AUTHZ = 7
+  SERVER_AUTHZ = 8
+  CERT_TYPE = 9
+  SUPPORTED_GROUPS = 10
+  EC_POINT_FORMATS = 11
+  SRP = 12
+  SIGNATURE_ALGORITHMS = 13
+  USE_SRTP = 14
+  HEARTBEAT = 15
+  APPLICATION_LAYER_PROTOCOL_NEGOTIATION = 16
+  STATUS_REQUEST_V2 = 17
+  SIGNED_CERTIFICATE_TIMESTAMP = 18
+  CLIENT_CERTIFICATE_TYPE = 19
+  SERVER_CERTIFICATE_TYPE = 20
+  PADDING = 21
+  ENCRYPT_THEN_MAC = 22
+  EXTENDED_MASTER_SECRET = 23
+  TOKEN_BINDING = 24
+  CACHED_INFO = 25
+  TLS_LTS = 26
+  COMPRESS_CERTIFICATE = 27
+  RECORD_SIZE_LIMIT = 28
+  PWD_PROTECT = 29
+  PWD_CLEAR = 30
+  PASSWORD_SALT = 31
+  TICKET_PINNING = 32
+  TLS_CERT_WITH_EXTERN_PSK = 33
+  DELEGATED_CREDENTIAL = 34
+  SESSION_TICKET = 34
+  TLMSP = 36
+  TLMSP_PROXYING = 37
+  TLMSP_DELEGATE = 38
+  SUPPORTED_EKT_CIPHERS = 39
+  RESERVED = 40
+  PRE_SHARED_KEY = 41
+  EARLY_DATA = 42
+  SUPPORTED_VERSIONS = 43
+  COOKIE = 44
+  PSK_KEY_EXCHANGE_MODES = 45
+  CERTIFICATE_AUTHORITIES = 47
+  OID_FILTERS = 48
+  POST_HANDSHAKE_AUTH = 49
+  SIGNATURE_ALGORITHMS_CERT = 50
+  KEY_SHARE = 51
+  TRANSPARENCY_INFO = 52
+  CONNECTION_ID = 54
+  EXTERNAL_ID_HASH = 55
+  EXTERNAL_SESSION_ID = 56
+  QUIC_TRANSPORT_PARAMETERS = 57
+  TICKET_REQUEST = 58
+  DNSSEC_CHAIN = 59
+  SEQUENCE_NUMBER_ENCRYPTION_ALGORITHMS = 60
+  RRC = 61
+  UNASIGNED = 62
+  ECH_OUTER_EXTENSIONS = 64768
+  ENCRYPTED_CLIENT_HELLO = 65037
+  RENEGOTIATION_INFO = 65281
+
+  @classmethod
+  def _missing_(cls, value):
+    if value in [46, 2570, 6682, 10794, 14906, 19018, 23130, 27242, 31354, 
+                 35466, 39578, 43690, 47802, 51914, 56026, 60138, 64250, 65280]:
+      return cls.RESERVED
+    
+    if 65282 <= value <= 65535:
+      return cls.RESERVED
+    
+    return cls.UNASIGNED
 
 
 class HandshakeExtension:
   # TODO: Add enum for extension type
   def __init__(self,
-               type: int,
+               type: HandshakeExtensionType,
                data: bytes):
     self.type = type
     self.data = data
@@ -44,7 +125,7 @@ class HandshakeExtension:
   def from_bytes(cls, data: bytes):
     reader = ByteReader(data)
 
-    type = reader.read_u16()
+    type = HandshakeExtensionType(reader.read_u16())
     length = reader.read_u16()
     data = reader.read_bytes(length)
 
@@ -65,7 +146,7 @@ class HandshakeExtension:
 
   def __str__(self) -> str:
     s = []
-    s.append(f"Type : {self.type:04x}")
+    s.append(f"Type : {self.type:04x} - {self.type.name.ljust(40)}")
     s.append(f"Length : {self.length}")
     s.append(f"Data : 0x{self.data[:8].hex()} ...")
     return "\t".join(s)

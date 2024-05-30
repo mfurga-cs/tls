@@ -2,6 +2,7 @@ from enum import Enum
 
 from utils import ByteReader, ByteWriter
 
+
 class RecordContentType(Enum):
   CHANGE_CIPHER_SPEC = 0x14
   ALERT = 0x15
@@ -9,11 +10,14 @@ class RecordContentType(Enum):
   APPLICATION_DATA = 0x17
   HEARTBEAT = 0x18
 
+
 class RecordVersion(Enum):
   SSL_3 = 0x0300
   TLS_1 = 0x0301
-  TLS_1_1 = 0x0303
+  TLS_1_1 = 0x0302
   TLS_1_2 = 0x0303
+  TLS_1_3 = 0x0304
+
 
 class Record:
   def __init__(self,

@@ -353,3 +353,5 @@ class CipherSuite(Enum):
   TLS_TBD_EAEA = 0xEAEA
   TLS_TBD_FAFA = 0xFAFA
 
+  TLS_FALLBACK_SCSV = 0x5600
+
