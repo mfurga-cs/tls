@@ -1,11 +1,12 @@
 # https://tls13.xargs.org/
 
-import struct
 from enum import IntEnum
 from typing import List
 
 from cipher_suites import CipherSuite
 from utils import ByteReader, ByteWriter
+
+from x25519 import base_point_mult
 
 
 class HandshakeType(IntEnum):
@@ -110,7 +111,6 @@ class HandshakeExtensionType(IntEnum):
 
 
 class HandshakeExtension:
-  # TODO: Add enum for extension type
   def __init__(self,
                type: HandshakeExtensionType,
                data: bytes):
@@ -156,6 +156,7 @@ class KeyShareEntry:
   def __init__(self, group: int, key: bytes):
     self.group = group
     self.key = key
+    self.pub_key = base_point_mult(key).encode()
 
   @property
   def length(self):
@@ -173,10 +174,12 @@ class KeyShareEntry:
 
   def __str__(self) -> str:
     s = []
+    s.append("** Server Key Exchange Generation **")
     s.append(f"Group : {self.group:04x}")
     s.append(f"Length : {self.length}")
     s.append(f"Key : 0x{self.key[:8].hex()} ...")
-    return "\t".join(s)
+    s.append(f"Public key : 0x{self.pub_key[:8].hex()} ...")
+    return "\n".join(s)
 
 
 class Handshake:
