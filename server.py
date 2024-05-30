@@ -2,6 +2,11 @@
 
 import socket
 import struct
+from random import randbytes
+
+from tls import Handshake, HandshakeType, HandshakeVersion, HandshakeExtension
+from record import Record, RecordContentType, RecordVersion
+from cipher_suites import CipherSuite
 
 HOST = "127.0.0.1"
 PORT = 1443
@@ -20,14 +25,33 @@ def main() -> None:
     if not data:
       break
 
-    print(data)
-    print(len(data))
+    # client hello
+    record = Record.from_bytes(data)
+    if record.content_type == RecordContentType.HANDSHAKE:
+      handshake = Handshake.from_bytes(record.data)
+      print(handshake)
 
-    """
-    with open("tls.bin", "wb") as f:
-      f.write(data)
-    break
-    """
+    # server hello
+    server_hello = Handshake(
+      type=HandshakeType.SERVER_HELLO,
+      version=HandshakeVersion.TLS_1_2,
+      random=randbytes(32),
+      session_id=randbytes(32),
+      cipher_suites=[CipherSuite.TLS_AES_256_GCM_SHA384],
+      compression_methods=[0],
+      extensions=[
+        HandshakeExtension(type=43, data=b"\x03\x04"),   # supported_versions: TLS 1.3
+        HandshakeExtension(type=51, data=randbytes(32)), # key_share: ...
+      ]
+    )
+
+    record = Record(
+      RecordContentType.HANDSHAKE,
+      RecordVersion.TLS_1_2,
+      server_hello.to_bytes()
+    )
+
+    client.send(record.to_bytes())
 
 if __name__ == "__main__":
   main()

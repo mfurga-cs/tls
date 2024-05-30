@@ -7,6 +7,7 @@ from typing import List
 from cipher_suites import CipherSuite
 from utils import ByteReader, ByteWriter
 
+
 class HandshakeType(Enum):
   HELLO_REQUEST = 0x00
   CLIENT_HELLO = 0x01
@@ -22,15 +23,22 @@ class HandshakeType(Enum):
   FINISHED = 0x14
   CERTIFICATE_STATUS = 0x16
 
+
+class HandshakeVersion(Enum):
+  TLS_1_2 = 0x0303
+
+
 class HandshakeExtension:
   # TODO: Add enum for extension type
   def __init__(self,
                type: int,
-               length: int,
                data: bytes):
     self.type = type
-    self.length = length
     self.data = data
+
+  @property
+  def length(self) -> int:
+    return len(self.data)
 
   @classmethod
   def from_bytes(cls, data: bytes):
@@ -40,7 +48,7 @@ class HandshakeExtension:
     length = reader.read_u16()
     data = reader.read_bytes(length)
 
-    return cls(type, length, data)
+    return cls(type, data)
 
   def to_bytes(self) -> bytes():
     writer = ByteWriter()
@@ -62,19 +70,19 @@ class HandshakeExtension:
     s.append(f"Data : 0x{self.data[:8].hex()} ...")
     return "\t".join(s)
 
+
 class Handshake:
   def __init__(self,
                type: HandshakeType,
-               length: int,
-               version: int,
+               version: HandshakeVersion,
                random: bytes,
                session_id: bytes,
                cipher_suites: List[CipherSuite],
                compression_methods: List[int],
                extensions: List[HandshakeExtension]):
     self.type = type
-    self.length = length
     self.version = version
+    assert len(random) == 32
     self.random = random
     self.session_id = session_id
     self.cipher_suites = cipher_suites
@@ -87,7 +95,7 @@ class Handshake:
 
     type = HandshakeType(reader.read_u8())
     length = reader.read_u24()
-    version = reader.read_u16()
+    version = HandshakeVersion(reader.read_u16())
     random = reader.read_bytes(32)
 
     session_id_length = reader.read_u8()
@@ -121,15 +129,33 @@ class Handshake:
       exts.append(extension)
       extensions = extensions[len(extension):]
 
-    return cls(type, length, version, random, session_id, cipher_suites,
+    return cls(type, version, random, session_id, cipher_suites,
                compression_methods, exts)
+
+  @property
+  def length(self) -> int:
+    l = 2 + 32 + 1 + len(self.session_id)
+
+    if self.type == HandshakeType.CLIENT_HELLO:
+      l += 2  # cipher suites len
+
+    l += len(self.cipher_suites) * 2
+
+    if self.type == HandshakeType.CLIENT_HELLO:
+      l += 1  # compression methods len
+
+    l += len(self.compression_methods)
+    l += 2  # extensions len
+    l += sum(len(ext) for ext in self.extensions)
+
+    return l
 
   def to_bytes(self) -> bytes:
     writer = ByteWriter()
 
     writer.write_u8(self.type.value)
     writer.write_u24(self.length)
-    writer.write_u16(self.version)
+    writer.write_u16(self.version.value)
 
     assert len(self.random) == 32
     writer.write_bytes(self.random)
@@ -182,7 +208,7 @@ class Handshake:
     s.append("** Handshake **")
     s.append(f"Type          : {self.type.name}")
     s.append(f"Length        : {self.length}")
-    s.append(f"Version       : 0x{self.version:04x}")
+    s.append(f"Version       : {self.version.name}")
     s.append(f"Random        : 0x{self.random.hex()}")
     s.append(f"Session ID    : 0x{self.session_id.hex()}")
     s.append(f"Cipher suites :")

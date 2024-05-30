@@ -336,5 +336,20 @@ class CipherSuite(Enum):
   TLS_CHACHA20_POLY1305_SHA256 = 0x1303
 
   # grease values (https://datatracker.ietf.org/doc/html/draft-ietf-tls-grease-01#page-3) ?
+  TLS_TBD_0A0A = 0x0A0A
+  TLS_TBD_1A1A = 0x1A1A
+  TLS_TBD_2A2A = 0x2A2A
+  TLS_TBD_3A3A = 0x3A3A
+  TLS_TBD_4A4A = 0x4A4A
+  TLS_TBD_5A5A = 0x5A5A
+  TLS_TBD_6A6A = 0x6A6A
+  TLS_TBD_7A7A = 0x7A7A
+  TLS_TBD_8A8A = 0x8A8A
   TLS_TBD_9A9A = 0x9A9A
+  TLS_TBD_AAAA = 0xAAAA
+  TLS_TBD_BABA = 0xBABA
+  TLS_TBD_CACA = 0xCACA
+  TLS_TBD_DADA = 0xDADA
+  TLS_TBD_EAEA = 0xEAEA
+  TLS_TBD_FAFA = 0xFAFA
 

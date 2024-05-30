@@ -19,12 +19,14 @@ class Record:
   def __init__(self,
                content_type: RecordContentType,
                version: RecordVersion,
-               length: int,
                data: bytes):
     self.content_type = content_type
     self.version = version
-    self.length = length
     self.data = data
+
+  @property
+  def length(self) -> int:
+    return len(self.data)
 
   @classmethod
   def from_bytes(cls, data: bytes):
@@ -35,7 +37,7 @@ class Record:
     length = reader.read_u16()
     data = reader.read_bytes(length)
 
-    return cls(content_type, version, length, data)
+    return cls(content_type, version, data)
 
   def to_bytes(self) -> bytes:
     writer = ByteWriter()
