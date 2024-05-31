@@ -105,8 +105,8 @@ def unpack2(s):
     if len(s) != 32:
         raise ValueError('Invalid Curve25519 scalar (len=%d)' % len(s))
     
-    t = sum((ord(s[i]) ) << (8 * i) for i in range(31))
-    t += (((ord(s[31]) ) & 0x7f) << 248)
+    t = sum((ord(s[i]) if type(s[i]) == str else s[i]) << (8 * i) for i in range(31))
+    t += (((ord(s[31]) if type(s[31]) == str else s[31]) & 0x7f) << 248)
 
     return t    
 
