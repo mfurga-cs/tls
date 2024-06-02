@@ -68,7 +68,7 @@ class HandshakeExtensionType(IntEnum):
   TICKET_PINNING = 32
   TLS_CERT_WITH_EXTERN_PSK = 33
   DELEGATED_CREDENTIAL = 34
-  SESSION_TICKET = 34
+  SESSION_TICKET = 35
   TLMSP = 36
   TLMSP_PROXYING = 37
   TLMSP_DELEGATE = 38
@@ -100,13 +100,13 @@ class HandshakeExtensionType(IntEnum):
 
   @classmethod
   def _missing_(cls, value):
-    if value in [46, 2570, 6682, 10794, 14906, 19018, 23130, 27242, 31354, 
+    if value in [46, 2570, 6682, 10794, 14906, 19018, 23130, 27242, 31354,
                  35466, 39578, 43690, 47802, 51914, 56026, 60138, 64250, 65280]:
       return cls.RESERVED
-    
+
     if 65282 <= value <= 65535:
       return cls.RESERVED
-    
+
     return cls.UNASIGNED
 
 
@@ -134,7 +134,7 @@ class HandshakeExtension:
   def to_bytes(self) -> bytes:
     writer = ByteWriter()
 
-    writer.write_u16(self.type)
+    writer.write_u16(self.type.value)
     writer.write_u16(self.length)
     assert self.length == len(self.data)
     data = writer.write_bytes(self.data)
@@ -146,7 +146,7 @@ class HandshakeExtension:
 
   def __str__(self) -> str:
     s = []
-    s.append(f"Type : {self.type:04x} - {self.type.name.ljust(40)}")
+    s.append(f"Type : {self.type.name.ljust(40)} (0x{self.type:04x})")
     s.append(f"Length : {self.length}")
     s.append(f"Data : 0x{self.data[:8].hex()} ...")
     return "\t".join(s)
@@ -156,11 +156,21 @@ class KeyShareEntry:
   def __init__(self, group: int, key: bytes):
     self.group = group
     self.key = key
-    self.pub_key = base_point_mult(key)
+    #self.pub_key = base_point_mult(key)
 
   @property
   def length(self):
     return len(self.key)
+
+  @classmethod
+  def from_bytes(cls, data: bytes):
+    reader = ByteReader(data)
+
+    group = reader.read_u16()
+    length = reader.read_u16()
+    key = reader.read_bytes(length)
+
+    return cls(group, key)
 
   def to_bytes(self) -> bytes:
     writer = ByteWriter()
@@ -172,13 +182,63 @@ class KeyShareEntry:
 
     return data
 
+  def __len__(self) -> int:
+    return len(self.to_bytes())
+
   def __str__(self) -> str:
     s = []
-    s.append("** Server Key Exchange Generation **")
-    s.append(f"Group : {self.group:04x}")
+    s.append(f"Group : 0x{self.group:04x}")
     s.append(f"Length : {self.length}")
     s.append(f"Key : 0x{self.key[:8].hex()} ...")
-    s.append(f"Public key : 0x{self.pub_key[:8].encode().hex()} ...")
+    #s.append(f"Public key : 0x{self.pub_key[:8].encode().hex()} ...")
+    return "\t".join(s)
+
+
+class KeyShareExtension:
+  def __init__(self, entries: KeyShareEntry):
+    self.entries = entries
+
+  @property
+  def length(self) -> int:
+    return sum(len(entry) for entry in self.entries)
+
+  @classmethod
+  def from_bytes(cls, data: bytes):
+    reader = ByteReader(data)
+
+    length = reader.read_u16()
+    data = reader.read_bytes(length)
+
+    entries = []
+    while len(data) > 0:
+      entry = KeyShareEntry.from_bytes(data)
+      entries.append(entry)
+      data = data[len(entry):]
+
+    return cls(entries)
+
+  def to_bytes(self) -> bytes:
+    writer = ByteWriter()
+
+    writer.write_u16(self.length)
+    entries = bytes.join(b"", [
+      entry.to_bytes() for entry in self.entries
+    ])
+    assert len(entries) == self.length
+    data = writer.write_bytes(entries)
+
+    return data
+
+  def __len__(self) -> int:
+    return len(self.to_bytes())
+
+  def __str__(self) -> str:
+    s = []
+    s.append("** Key Share Extension **")
+    s.append("Entries :")
+
+    for entry in self.entries:
+      s.append(f"  {str(entry)}")
     return "\n".join(s)
 
 
