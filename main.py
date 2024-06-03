@@ -6,6 +6,7 @@ import sys
 from random import randbytes
 from time import sleep
 from hashlib import sha384
+import hmac
 from Crypto.Cipher import AES
 from Crypto.Signature import pss
 from Crypto.PublicKey import RSA
@@ -185,9 +186,9 @@ def parse_tls_packet(data: bytes) -> None:
   cipher.update(bytes.fromhex("1703030017"))  # record header
   encrypted_data, mac_tag = cipher.encrypt_and_digest(bytes.fromhex("08000002000016"))
 
-  print()
-  print(encrypted_data.hex())
-  print(mac_tag.hex())
+  #print()
+  #print(encrypted_data.hex())
+  #print(mac_tag.hex())
 
   server_application_data_1 = Record(
     RecordContentType.APPLICATION_DATA,
@@ -195,6 +196,7 @@ def parse_tls_packet(data: bytes) -> None:
     encrypted_data + mac_tag
   )
 
+  # wrapped record: server certificate
   writer = ByteWriter()
 
   certificate = bytes.fromhex("3082032130820209a0030201020208155a92adc2048f90300d06092a864886f70d01010b05003022310b300906035504061302555331133011060355040a130a4578616d706c65204341301e170d3138313030353031333831375a170d3139313030353031333831375a302b310b3009060355040613025553311c301a060355040313136578616d706c652e756c666865696d2e6e657430820122300d06092a864886f70d01010105000382010f003082010a0282010100c4803606bae7476b089404eca7b691043ff792bc19eefb7d74d7a80d001e7b4b3a4ae60fe8c071fc73e7024c0dbcf4bdd11d396bba70464a13e94af83df3e10959547bc955fb412da3765211e1f3dc776caa53376eca3aecbec3aab73b31d56cb6529c8098bcc9e02818e20bf7f8a03afd1704509ece79bd9f39f1ea69ec47972e830fb5ca95de95a1e60422d5eebe527954a1e7bf8a86f6466d0d9f16951a4cf7a04692595c1352f2549e5afb4ebfd77a37950144e4c026874c653e407d7d23074401f484ffd08f7a1fa05210d1f4f0d5ce79702932e2cabe701fdfad6b4bb71101f44bad666a11130fe2ee829e4d029dc91cdd6716dbb9061886edc1ba94210203010001a3523050300e0603551d0f0101ff0404030205a0301d0603551d250416301406082b0601050507030206082b06010505070301301f0603551d23041830168014894fde5bcc69e252cf3ea300dfb197b81de1c146300d06092a864886f70d01010b05000382010100591645a69a2e3779e4f6dd271aba1c0bfd6cd75599b5e7c36e533eff3659084324c9e7a504079d39e0d42987ffe3ebdd09c1cf1d914455870b571dd19bdf1d24f8bb9a11fe80fd592ba0398cde11e2651e618ce598fa96e5372eef3d248afde17463ebbfabb8e4d1ab502a54ec0064e92f7819660d3f27cf209e667fce5ae2e4ac99c7c93818f8b2510722dfed97f32e3e9349d4c66c9ea6396d744462a06b42c6d5ba688eac3a017bddfc8e2cfcad27cb69d3ccdca280414465d3ae348ce0f34ab2fb9c618371312b191041641c237f11a5d65c844f0404849938712b959ed685bc5c5dd645ed19909473402926dcb40e3469a15941e8e2cca84bb6084636a0")
@@ -218,9 +220,9 @@ def parse_tls_packet(data: bytes) -> None:
   cipher.update(bytes.fromhex("1703030343"))
   encrypted_data, mac_tag = cipher.encrypt_and_digest(server_certificate)
 
-  print()
-  print(encrypted_data.hex())
-  print(mac_tag.hex())
+  #print()
+  #print(encrypted_data.hex())
+  #print(mac_tag.hex())
 
   server_application_data_2 = Record(
     RecordContentType.APPLICATION_DATA,
@@ -228,7 +230,82 @@ def parse_tls_packet(data: bytes) -> None:
     encrypted_data + mac_tag
   )
 
-  #print(server_application_data_2.to_bytes().hex())
+  # wrapped record: certificate verify
+  cert_private_key = RSA.import_key(open("certs/key.pem", "rb").read())
+  h = SHA256.new(hello_hash)
+  signature = pss.new(cert_private_key).sign(h)
+
+  writer = ByteWriter()
+
+  writer.write_u8(HandshakeType.CERTIFICATE_VERIFY)  # handshake type
+  writer.write_u24(2 + 2 + len(signature))  # length of the data
+  writer.write_u16(0x0804)  # RSA-PSS-RSAE-SHA256
+  writer.write_u16(len(signature))
+  writer.write_bytes(signature)
+  writer.write_u8(0x16)  # record type
+
+  certificate_verify = writer.data
+
+  cipher = AES.new(
+    server_handshake_key,
+    AES.MODE_GCM,
+    (int.from_bytes(server_handshake_iv, "big") ^ 2).to_bytes(12, "big")
+  )
+  cipher.update(b"\x17\x03\x03" + (len(certificate_verify) + 16).to_bytes(2, "big"))
+  encrypted_data, mac_tag = cipher.encrypt_and_digest(server_certificate)
+
+  #print()
+  #print(encrypted_data.hex())
+  #print(mac_tag.hex())
+
+  server_application_data_3 = Record(
+    RecordContentType.APPLICATION_DATA,
+    RecordVersion.TLS_1_2,
+    encrypted_data + mac_tag
+  )
+
+  # server handshake finished
+
+  finished_key = hkdf_expand_label(
+    server_secret,
+    label=b"finished",
+    hash_value=b"",
+    length=48,
+    hash=sha384
+  )
+
+  finished_hash = bytes.fromhex(sha384(
+    client_record.to_bytes() + \
+    server_hello_record.to_bytes() + \
+    server_change_cipher_spec.to_bytes() + \
+    server_application_data_1.to_bytes() + \
+    server_application_data_2.to_bytes() + \
+    server_application_data_3.to_bytes()
+  ).hexdigest())
+
+  verify_data = bytes.fromhex(
+    hmac.new(finished_key, finished_hash, sha384).hexdigest())
+
+  writer = ByteWriter()
+  writer.write_u8(HandshakeType.FINISHED)  # handshake type
+  writer.write_u24(len(verify_data))
+  writer.write_bytes(verify_data)
+  writer.write_u8(0x16)  # record type
+  handshake_finished = writer.data
+
+  cipher = AES.new(
+    server_handshake_key,
+    AES.MODE_GCM,
+    (int.from_bytes(server_handshake_iv, "big") ^ 3).to_bytes(12, "big")
+  )
+  cipher.update(b"\x17\x03\x03" + (len(handshake_finished) + 16).to_bytes(2, "big"))
+  encrypted_data, mac_tag = cipher.encrypt_and_digest(server_certificate)
+
+  server_application_data_4 = Record(
+    RecordContentType.APPLICATION_DATA,
+    RecordVersion.TLS_1_2,
+    encrypted_data + mac_tag
+  )
 
 
 def main() -> None:

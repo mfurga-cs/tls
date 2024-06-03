@@ -98,6 +98,7 @@ class HandshakeExtensionType(IntEnum):
   ENCRYPTED_CLIENT_HELLO = 65037
   RENEGOTIATION_INFO = 65281
 
+  # TODO: Move these values to enum fields.
   @classmethod
   def _missing_(cls, value):
     if value in [46, 2570, 6682, 10794, 14906, 19018, 23130, 27242, 31354,
