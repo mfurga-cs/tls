@@ -8,6 +8,7 @@ from Crypto.Cipher import AES
 from Crypto.Signature import pss
 from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256
+import hmac
 
 from utils import ByteReader, ByteWriter
 
@@ -91,8 +92,8 @@ def main() -> None:
           cipher_suites=[CipherSuite.TLS_AES_256_GCM_SHA384],
           compression_methods=[0],
           extensions=[
-            HandshakeExtension(type=HandshakeExtensionType.SUPPORTED_VERSIONS, data=HandshakeVersion.TLS_1_3.to_bytes(2)),
             HandshakeExtension(type=HandshakeExtensionType.KEY_SHARE, data=key.to_bytes()),
+            HandshakeExtension(type=HandshakeExtensionType.SUPPORTED_VERSIONS, data=HandshakeVersion.TLS_1_3.to_bytes(2))
           ]
         )
 
@@ -101,9 +102,6 @@ def main() -> None:
           RecordVersion.TLS_1_2,
           server_hello.to_bytes()
         )
-
-        print("Sending Server Hello...", end="\n\n")
-        client.send(server_hello_record.to_bytes())
 
         # server handshake keys calc
         handshakes_hash = bytes.fromhex(sha384(record.to_bytes()[5:] + server_hello_record.to_bytes()[5:]).hexdigest())
@@ -126,8 +124,8 @@ def main() -> None:
           server_change_cipher_spec.to_bytes()
         )
 
-        print("Sending Server Change Cipher Spec...", end="\n\n")
-        client.send(server_change_cipher_spec_record.to_bytes())
+        # print("Sending Server Hello and Server Change Cipher Spec...", end="\n\n")
+        # client.send(server_hello_record.to_bytes() + server_change_cipher_spec_record.to_bytes())
 
         # wrapped record: encrypted extensions
         record_header = RecordContentType.APPLICATION_DATA.value.to_bytes() + RecordVersion.TLS_1_2.value.to_bytes(2) + 0x17.to_bytes(2)
@@ -139,9 +137,6 @@ def main() -> None:
         encrypted_data, mac_tag = cipher.encrypt_and_digest(extra_extensions)
 
         encrypted_extensions_record = record_header + encrypted_data + mac_tag
-
-        print("Sending Wrapped Record: Encrypted Extensions...", end="\n\n")
-        client.send(encrypted_extensions_record)
 
         # wrapped record: server certificate
         record_header = RecordContentType.APPLICATION_DATA.value.to_bytes() + RecordVersion.TLS_1_2.value.to_bytes(2) + (835).to_bytes(2)
@@ -167,9 +162,6 @@ def main() -> None:
 
         server_certificate_record = record_header + encrypted_data + mac_tag
 
-        print("Sending Wrapped Record: Server Certificate...", end="\n\n")
-        client.send(server_certificate_record)
-
         # wrapped record: certificate verify
         cert_private_key = RSA.import_key(open("certs/key.pem", "rb").read())
         h = SHA256.new(handshakes_hash)
@@ -188,11 +180,30 @@ def main() -> None:
 
         certificate_verify_record = record_header + encrypted_data + mac_tag
 
-        print("Sending Wrapped Record: Certificate Verify...", end="\n\n")
-        client.send(certificate_verify_record)
-
         # wrapped record: server handshake finished
-        # TODO
+        finished_key = hkdf_expand_label(ssecret, label="finished".encode(), hash_value="".encode(), length=48, hash=sha384)
+        finished_hash = bytes.fromhex(sha384(record.data[5:] + server_hello_record.to_bytes()[5:] + encrypted_extensions_record[1:] + 
+                                             server_certificate_record[1:] + certificate_verify_record[1:]).hexdigest())
+        verify_data = hmac.new(finished_key, finished_hash, sha384).hexdigest()
+        verify_data = bytes.fromhex(''.join([str(hex(ord(char))[2:]).zfill(2) for char in verify_data]))
+
+        server_handshake_finished = HandshakeType.FINISHED.value.to_bytes() + len(verify_data).to_bytes(3) + verify_data
+
+        record_header = RecordContentType.APPLICATION_DATA.value.to_bytes() + RecordVersion.TLS_1_2.value.to_bytes(2) + (len(server_handshake_finished) + 1 + 16).to_bytes(2)
+
+        cipher = AES.new(server_handshake_key, AES.MODE_GCM, (int.from_bytes(server_handshake_iv) ^ 3).to_bytes(12))  # XOR with 3 (the forth encrypted record)
+        cipher.update(record_header)
+        encrypted_data, mac_tag = cipher.encrypt_and_digest(server_handshake_finished)
+
+        server_handshake_finished_record = record_header + encrypted_data + mac_tag
+
+        print("Sending Server Hello and Server Change Cipher Spec...", end="\n\n")
+        client.send(server_hello_record.to_bytes() + server_change_cipher_spec_record.to_bytes())
+
+        print("Sending Wrapped Records: Encrypted Extensions, Server Certificate, Certificate Verify, Server Handshake Finished...", end="\n\n")
+        client.send(encrypted_extensions_record + server_certificate_record + certificate_verify_record + server_handshake_finished_record)
+
+        exit(0)
       elif record.content_type == RecordContentType.CHANGE_CIPHER_SPEC:  # client change cipher spec
         continue
       elif record.content_type == RecordContentType.ALERT:  # alert
