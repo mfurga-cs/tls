@@ -128,7 +128,7 @@ def main() -> None:
         # client.send(server_hello_record.to_bytes() + server_change_cipher_spec_record.to_bytes())
 
         # wrapped record: encrypted extensions
-        record_header = RecordContentType.APPLICATION_DATA.value.to_bytes() + RecordVersion.TLS_1_2.value.to_bytes(2) + 0x17.to_bytes(2)
+        record_header = RecordContentType.APPLICATION_DATA.value.to_bytes() + RecordVersion.TLS_1_2.value.to_bytes(2) + (7 + 16).to_bytes(2)
 
         extra_extensions = bytes.fromhex("08000002000016")
 
@@ -139,22 +139,22 @@ def main() -> None:
         encrypted_extensions_record = record_header + encrypted_data + mac_tag
 
         # wrapped record: server certificate
-        record_header = RecordContentType.APPLICATION_DATA.value.to_bytes() + RecordVersion.TLS_1_2.value.to_bytes(2) + (835).to_bytes(2)
-
         certificate = bytes.fromhex("3082056130820349a003020102021468bce59c2acde12367446ea82f8a4ea8d07cbcb9300d06092a864886f70d01010b05003040310b300906035504061302504c310f300d06035504070c064b72616b6f77310c300a060355040a0c034147483112301006035504030c096c6f63616c686f7374301e170d3234303533313230313035315a170d3334303532393230313035315a3040310b300906035504061302504c310f300d06035504070c064b72616b6f77310c300a060355040a0c034147483112301006035504030c096c6f63616c686f737430820222300d06092a864886f70d01010105000382020f003082020a02820201009afda8f6965993bf7758a08a2bcf5fa249f6cc988c341d1b864a052f3debd76fce215fd9b2d8b1002e116c369d1d25b58a1e1c9fdc54077128856024c3fe3fc6671cbb9feb8eef55d36f7221e34a2241959b6204dff2cc93ca25bc97ae6334f6569cbbfbfb5cbc431100b61809cd711696fcf1eb19ac7f5a1c1833ca4959c4bbe6f8424981c1d00b65228ddcbabe0e10d5b68ea37b4d39c54a489b3ca2c50805f715b4696fe0cc65fdb170672dda08d5995a799a0fd2f209d03c2766bb7ad4045d280fcf92307830d31d6ef3a681e09905646ab92bd466936914b275241822eba8b98a4383e19bdfbd6e13675a69c61d2a1f699e88ecb3a434decdd68690c9c18dcca81cadfd37151d416828a4112df4160f1978a8b4941bc9ce9b38e39cacc5f43d13b25f3b965436b5748ffe9ccc05c2b2de80221d607cf007ec1565260d0f41a17688205bf92d68602ab3b1c2820fe70e59c98b99fbfdf056e2acdad8ae532976c9b1318ef740249308b36fbf07d43cc587b7bbb92440cde62ed56d85d8b70e47806a1e2dd4e5b1d0b9fe9bd324f9172115d95b4e9fb1e62073d79b02a8e2725a997290c33af4f139aa6595616b95c2103feab38ac4d53894388657dca2be2c986d42bc52aaf191ddc0c7ba596b62d35a13278df0925b78446bb4b25145be3f086991afef580e1539dcd531c55c7554c8ce1f80181486bfc5d99aefd27ab50203010001a3533051301d0603551d0e041604146bfc50bdad75ad3d4efe7760dbf8969f3b809d5d301f0603551d230418301680146bfc50bdad75ad3d4efe7760dbf8969f3b809d5d300f0603551d130101ff040530030101ff300d06092a864886f70d01010b0500038202010000855b6306bd9d861b31c376c41168642f76f9ed3d32778831855436826eac7888aa0b5a0752eee558532acd93b90f6b82b68711d7a16a00791fb3b1f321d54d234b46efcedf8a525916a0e1b738055d097b5949b66db20666f024e02643ab9a3df2d30ee59405f5198a5cd3794f6a0a2a162d0ea173427f63014f06c445d85d4b1a8a026afce2f8b3d4c2fe1c32a8ad27577751abfd719ec2e5d13bc1713e696a69566a5d53871233a6f89817cdbb934091928876b88fd1fbab419bc413023da2ddadd35b3037366e6166dcfd9aadd7e4bea93be9a4d1c50947ec1a1e9c20767010c99763be82f7b0db350aea7c1f62e9c31f6647411893d5e462b2b1c4a9e2befc3b9a75bbab09321a354d117201e17c3a7cca243933e8bfc84b061ae64fb87de3f07782b1e56d305f29474346efa37f839aa05c3ae7231025b80b78d63d0abf458685048ea003c74442bce679c328e30de69ccfd27844833870a01da3614b7a3febc9f9c5603b1ab1f4b09f3a284c2e7326d712f14c1020581b4ae78e8f3e0ca1b1cb9f9899a7856b790daea2aac206a30728da7345fb96294d716236db64ffb93bb0ccfa662bc9e3d229f7e173d90795b0acae076c015024a932852713a4fca621c58c81cd93ee422eee0d6146630b5e28e603598a762bf4614166945cce8ff331da9b78165eda3072e9ccaf8bd3d9eb6b6ace602de69f39b76b17a50f89")
         # openssl x509 -outform der < cert.pem | xxd -p -c 1000000
+
+        record_header = RecordContentType.APPLICATION_DATA.value.to_bytes() + RecordVersion.TLS_1_2.value.to_bytes(2) + (13 + len(certificate) + 1 + 16).to_bytes(2)
 
         writer = ByteWriter()
 
         writer.write_u8(HandshakeType.CERTIFICATE)  # handshake type
         writer.write_u24(1 + 3 + 3 + len(certificate) + 2)  # length of the data
         writer.write_u8(0x00)  # request context
-        writer.write_u24(3 + len(certificate) + 2)  # length of the certificate
+        writer.write_u24(3 + len(certificate) + 2)  # length of certificates
         writer.write_u24(len(certificate))  # length of the first (and only) certificate
         writer.write_bytes(certificate)  # certificate
         writer.write_u16(0x0000)  # certificate extensions
 
-        server_certificate = writer.data
+        server_certificate = writer.data + (0x16).to_bytes()
 
         cipher = AES.new(server_handshake_key, AES.MODE_GCM, (int.from_bytes(server_handshake_iv) ^ 1).to_bytes(12))  # XOR with 1 (the second encrypted record)
         cipher.update(record_header)
@@ -170,7 +170,7 @@ def main() -> None:
         certificate_verify = HandshakeType.CERTIFICATE_VERIFY.value.to_bytes() + (2 + 2 + len(signature)).to_bytes(3)
         certificate_verify += 0x0804.to_bytes(2)  # reserved value for RSA-PSS-RSAE-SHA256 signature
         certificate_verify += len(signature).to_bytes(2)  # length of the signature
-        certificate_verify += signature
+        certificate_verify += signature + (0x16).to_bytes()
 
         record_header = RecordContentType.APPLICATION_DATA.value.to_bytes() + RecordVersion.TLS_1_2.value.to_bytes(2) + (len(certificate_verify) + 1 + 16).to_bytes(2)
 
@@ -187,7 +187,7 @@ def main() -> None:
         verify_data = hmac.new(finished_key, finished_hash, sha384).hexdigest()
         verify_data = bytes.fromhex(''.join([str(hex(ord(char))[2:]).zfill(2) for char in verify_data]))
 
-        server_handshake_finished = HandshakeType.FINISHED.value.to_bytes() + len(verify_data).to_bytes(3) + verify_data
+        server_handshake_finished = HandshakeType.FINISHED.value.to_bytes() + len(verify_data).to_bytes(3) + verify_data + (0x16).to_bytes()
 
         record_header = RecordContentType.APPLICATION_DATA.value.to_bytes() + RecordVersion.TLS_1_2.value.to_bytes(2) + (len(server_handshake_finished) + 1 + 16).to_bytes(2)
 
@@ -196,6 +196,11 @@ def main() -> None:
         encrypted_data, mac_tag = cipher.encrypt_and_digest(server_handshake_finished)
 
         server_handshake_finished_record = record_header + encrypted_data + mac_tag
+
+        print(f"len(encrypted_extensions_record): {len(encrypted_extensions_record)}")
+        print(f"len(server_certificate_record): {len(server_certificate_record)}")
+        print(f"len(certificate_verify_record): {len(certificate_verify_record)}")
+        print(f"len(server_handshake_finished_record): {len(server_handshake_finished_record)}")
 
         print("Sending Server Hello and Server Change Cipher Spec...", end="\n\n")
         client.send(server_hello_record.to_bytes() + server_change_cipher_spec_record.to_bytes())
