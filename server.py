@@ -230,6 +230,7 @@ def main() -> None:
         print(f"auth_tag: {auth_tag.hex()}")
 
         cipher = AES.new(client_application_key, AES.MODE_GCM, (int.from_bytes(client_application_iv) ^ 0).to_bytes(12))
+        cipher.update(record.to_bytes()[:5])
 
         try:
           message = cipher.decrypt_and_verify(encrypted_data, auth_tag)
