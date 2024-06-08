@@ -184,23 +184,17 @@ def main() -> None:
         finished_key = hkdf_expand_label(ssecret, label="finished".encode(), hash_value="".encode(), length=48, hash=sha384)
         finished_hash = bytes.fromhex(sha384(record.data[5:] + server_hello_record.to_bytes()[5:] + encrypted_extensions_record[1:] + 
                                              server_certificate_record[1:] + certificate_verify_record[1:]).hexdigest())
-        verify_data = hmac.new(finished_key, finished_hash, sha384).hexdigest()
-        verify_data = bytes.fromhex(''.join([str(hex(ord(char))[2:]).zfill(2) for char in verify_data]))
+        verify_data = bytes.fromhex(hmac.new(finished_key, finished_hash, sha384).hexdigest())
 
         server_handshake_finished = HandshakeType.FINISHED.value.to_bytes() + len(verify_data).to_bytes(3) + verify_data + (0x16).to_bytes()
 
-        record_header = RecordContentType.APPLICATION_DATA.value.to_bytes() + RecordVersion.TLS_1_2.value.to_bytes(2) + (len(server_handshake_finished) + 1 + 16).to_bytes(2)
+        record_header = RecordContentType.APPLICATION_DATA.value.to_bytes() + RecordVersion.TLS_1_2.value.to_bytes(2) + (len(server_handshake_finished) + 16).to_bytes(2)
 
         cipher = AES.new(server_handshake_key, AES.MODE_GCM, (int.from_bytes(server_handshake_iv) ^ 3).to_bytes(12))  # XOR with 3 (the forth encrypted record)
         cipher.update(record_header)
         encrypted_data, mac_tag = cipher.encrypt_and_digest(server_handshake_finished)
 
         server_handshake_finished_record = record_header + encrypted_data + mac_tag
-
-        print(f"len(encrypted_extensions_record): {len(encrypted_extensions_record)}")
-        print(f"len(server_certificate_record): {len(server_certificate_record)}")
-        print(f"len(certificate_verify_record): {len(certificate_verify_record)}")
-        print(f"len(server_handshake_finished_record): {len(server_handshake_finished_record)}")
 
         print("Sending Server Hello and Server Change Cipher Spec...", end="\n\n")
         client.send(server_hello_record.to_bytes() + server_change_cipher_spec_record.to_bytes())
