@@ -90,7 +90,7 @@ def main() -> None:
           type=HandshakeType.SERVER_HELLO,
           version=HandshakeVersion.TLS_1_2,
           random=randbytes(32),
-          session_id=randbytes(32),
+          session_id=handshake.session_id,
           cipher_suites=[CipherSuite.TLS_AES_256_GCM_SHA384],
           compression_methods=[0],
           extensions=[
