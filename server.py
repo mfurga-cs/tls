@@ -172,7 +172,7 @@ def main() -> None:
         certificate_verify += len(signature).to_bytes(2)  # length of the signature
         certificate_verify += signature + (0x16).to_bytes()
 
-        record_header = RecordContentType.APPLICATION_DATA.value.to_bytes() + RecordVersion.TLS_1_2.value.to_bytes(2) + (len(certificate_verify) + 1 + 16).to_bytes(2)
+        record_header = RecordContentType.APPLICATION_DATA.value.to_bytes() + RecordVersion.TLS_1_2.value.to_bytes(2) + (len(certificate_verify) + 16).to_bytes(2)
 
         cipher = AES.new(server_handshake_key, AES.MODE_GCM, (int.from_bytes(server_handshake_iv) ^ 2).to_bytes(12))  # XOR with 2 (the third encrypted record)
         cipher.update(record_header)
