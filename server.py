@@ -21,7 +21,8 @@ from tls import (
   HandshakeVersion,
   HandshakeExtension,
   HandshakeExtensionType,
-  KeyShareEntry
+  KeyShareEntry,
+  KeyShareExtension
 )
 from record import Record, RecordContentType, RecordVersion
 from cipher_suites import CipherSuite
@@ -69,13 +70,14 @@ def main() -> None:
           print("Client Hello does not contain the Key Share extension, aborting", end="\n\n")
           break
 
-        reader = ByteReader(client_key_share.data)
+        key_share_ext = KeyShareExtension.from_bytes(client_key_share.data)
+        client_pub_key = next((entry for entry in key_share_ext.entries if entry.group == 29), None)
 
-        client_pub_key_share_len = reader.read_u16()
-        client_pub_key_share_unknown = reader.read_bytes(5)
-        client_pub_key_group = reader.read_u16()
-        client_pub_key_len = reader.read_u16()
-        client_pub_key = reader.read_bytes(client_pub_key_len)
+        if client_pub_key is None:
+          print("Handshake does not contain the x25519 Key Share Entry")
+          return
+
+        client_pub_key = client_pub_key.key
 
         print(f"Client's public key: 0x{client_pub_key[:8].hex()} ...", end="\n\n")
 
