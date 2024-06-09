@@ -10,9 +10,9 @@ from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256
 import hmac
 
-from utils import ByteReader, ByteWriter
+from utils import ByteWriter
 
-from x25519 import multscalar
+from x25519 import multscalar, base_point_mult
 from hkdf import hkdf_extract, hkdf_expand_label
 
 from tls import (
@@ -70,8 +70,8 @@ def main() -> None:
           print("Client Hello does not contain the Key Share extension, aborting", end="\n\n")
           break
 
-        key_share_ext = KeyShareExtension.from_bytes(client_key_share.data)
-        client_pub_key = next((entry for entry in key_share_ext.entries if entry.group == 29), None)
+        client_key_share_ext = KeyShareExtension.from_bytes(client_key_share.data)
+        client_pub_key = next((entry for entry in client_key_share_ext.entries if entry.group == 29), None)
 
         if client_pub_key is None:
           print("Handshake does not contain the x25519 Key Share Entry")
@@ -82,8 +82,12 @@ def main() -> None:
         print(f"Client's public key: 0x{client_pub_key[:8].hex()} ...", end="\n\n")
 
         # server key exchange generation
-        key = KeyShareEntry(group=29, key=randbytes(32))
-        print(key, end="\n\n")
+        server_priv_key_entry = KeyShareEntry(group=29, key=randbytes(32))
+        print(f"Server Private Key:\n{server_priv_key_entry}", end="\n\n")
+
+        server_pub_key = bytes.fromhex(''.join([str(hex(ord(char))[2:]).zfill(2) for char in base_point_mult(server_priv_key_entry.key)]))
+        server_pub_key_entry = KeyShareEntry(group=29, key=server_pub_key)
+        print(f"Server Public Key:\n{server_pub_key_entry}", end="\n\n")
 
         # server hello
         server_hello = Handshake(
@@ -94,7 +98,7 @@ def main() -> None:
           cipher_suites=[CipherSuite.TLS_AES_256_GCM_SHA384],
           compression_methods=[0],
           extensions=[
-            HandshakeExtension(type=HandshakeExtensionType.KEY_SHARE, data=key.to_bytes()),
+            HandshakeExtension(type=HandshakeExtensionType.KEY_SHARE, data=server_pub_key_entry.to_bytes()),
             HandshakeExtension(type=HandshakeExtensionType.SUPPORTED_VERSIONS, data=HandshakeVersion.TLS_1_3.to_bytes(2))
           ]
         )
@@ -107,7 +111,7 @@ def main() -> None:
 
         # server handshake keys calc
         handshakes_hash = bytes.fromhex(sha384(record.to_bytes()[5:] + server_hello_record.to_bytes()[5:]).hexdigest())
-        shared_secret = bytes.fromhex(''.join([str(hex(ord(char))[2:]).zfill(2) for char in multscalar(key.key, client_pub_key)]))
+        shared_secret = bytes.fromhex(''.join([str(hex(ord(char))[2:]).zfill(2) for char in multscalar(server_priv_key_entry.key, client_pub_key)]))
         zero_key = bytes.fromhex("0" * 96)
         early_secret = hkdf_extract(bytes.fromhex("00"), zero_key, hash=sha384)
         empty_hash = bytes.fromhex(sha384("".encode()).hexdigest())
