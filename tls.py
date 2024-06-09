@@ -6,6 +6,8 @@ from typing import List
 from cipher_suites import CipherSuite
 from utils import ByteReader, ByteWriter
 
+from x25519 import base_point_mult
+
 
 class HandshakeType(IntEnum):
   HELLO_REQUEST = 0x00
@@ -96,12 +98,34 @@ class HandshakeExtensionType(IntEnum):
   ENCRYPTED_CLIENT_HELLO = 65037
   RENEGOTIATION_INFO = 65281
 
+  RESERVED_46 = 46
+  RESERVED_2570 = 2570
+  RESERVED_6682 = 6682
+  RESERVED_10794 = 10794
+  RESERVED_14906 = 14906
+  RESERVED_19018 = 19018
+  RESERVED_23130 = 23130
+  RESERVED_27242 = 27242
+  RESERVED_31354 = 31354
+  RESERVED_35466 = 35466
+  RESERVED_39578 = 39578
+  RESERVED_43690 = 43690
+  RESERVED_47802 = 47802
+  RESERVED_51914 = 51914
+  RESERVED_56026 = 56026
+  RESERVED_60138 = 60138
+  RESERVED_64250 = 64250
+  RESERVED_65280 = 65280
+
+  UNASIGNED_17513 = 17513
+
+
   # TODO: Move these values to enum fields.
   @classmethod
   def _missing_(cls, value):
-    if value in [46, 2570, 6682, 10794, 14906, 19018, 23130, 27242, 31354,
-                 35466, 39578, 43690, 47802, 51914, 56026, 60138, 64250, 65280]:
-      return cls.RESERVED
+    # if value in [46, 2570, 6682, 10794, 14906, 19018, 23130, 27242, 31354,
+    #              35466, 39578, 43690, 47802, 51914, 56026, 60138, 64250, 65280]:
+    #   return cls.RESERVED
 
     if 65282 <= value <= 65535:
       return cls.RESERVED
@@ -155,6 +179,7 @@ class KeyShareEntry:
   def __init__(self, group: int, key: bytes):
     self.group = group
     self.key = key
+    #self.pub_key = base_point_mult(key)
 
   @property
   def length(self):
@@ -188,6 +213,7 @@ class KeyShareEntry:
     s.append(f"Group : 0x{self.group:04x}")
     s.append(f"Length : {self.length}")
     s.append(f"Key : 0x{self.key[:8].hex()} ...")
+    #s.append(f"Public key : 0x{self.pub_key[:8].encode().hex()} ...")
     return "\t".join(s)
 
 
