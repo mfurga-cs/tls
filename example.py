@@ -142,7 +142,7 @@ server_certificate_record = record_header + server_certificate_encrypted + mac_t
 # wrapped record: certificate verify
 # handshakes_hash = bytes.fromhex(sha384(record.to_bytes()[5:] + server_hello_record.to_bytes()[5:] + extra_extensions + server_certificate).hexdigest())
 # cert_private_key = RSA.import_key(open("certs/server.key", "rb").read())
-# h = SHA256.new(handshakes_hash)
+# h = SHA256.new(b'\x20' * 64 + "TLS 1.3, server CertificateVerify".encode() + b'\x00' + handshakes_hash)
 # signature = pss.new(cert_private_key).sign(h)
 
 signature = bytes.fromhex("5cbb24c0409332daa920bbabbdb9bd50170be49cfbe0a4107fca6ffb1068e65f969e6de7d4f9e56038d67c69c031403a7a7c0bcc8683e65721a0c72cc6634019ad1d3ad265a812615ba36380372084f5daec7e63d3f4933f27227419a611034644dcdbc7be3e74ffac473faaadde8c2fc65f3265773e7e62de33861fa705d19c506e896c8d82f5bcf35fece259b71538115e9c8cfba62e49bb8474f58587b11b8ae317c633e9c76c791d466284ad9c4ff735a6d2e963b59bbca440a307091a1b4e46bcc7a2f9fb2f1c898ecb19918be4121d7e8ed04cd50c9a59e987980107bbbf299c232e7fdbe10a4cfdae5c891c96afdff94b54ccd2bc19d3cdaa6644859c")
