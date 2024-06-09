@@ -1,6 +1,9 @@
 # Working implementation using payloads from https://tls13.xargs.org
 from hashlib import sha384
 from Crypto.Cipher import AES
+from Crypto.Signature import pss
+from Crypto.PublicKey import RSA
+from Crypto.Hash import SHA256
 import hmac
 
 from utils import ByteWriter
@@ -134,7 +137,8 @@ server_certificate_encrypted, mac_tag = cipher.encrypt_and_digest(server_certifi
 server_certificate_record = record_header + server_certificate_encrypted + mac_tag
 
 # wrapped record: certificate verify
-# cert_private_key = RSA.import_key(open("certs/key.pem", "rb").read())
+# handshakes_hash = bytes.fromhex(sha384(record.to_bytes()[5:] + server_hello_record.to_bytes()[5:] + extra_extensions + server_certificate).hexdigest())
+# cert_private_key = RSA.import_key(open("certs/server.key", "rb").read())
 # h = SHA256.new(handshakes_hash)
 # signature = pss.new(cert_private_key).sign(h)
 
