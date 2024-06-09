@@ -267,7 +267,7 @@ def main() -> None:
         print(f"Decrypted message: {message}")
 
         # send a simple HTTP response
-        http_response = "HTTP/1.0 200 OK\nContent-Type: text/html\n\n <h1><b>AGH has been successfully hacked</b></h1> \n\n".encode()
+        http_response = "HTTP/1.0 200 OK\nContent-Type: text/html; charset=utf-8\n\n <h1><b>💩</b></h1> \n\n".encode()
 
         record_header = RecordContentType.APPLICATION_DATA.value.to_bytes() + RecordVersion.TLS_1_2.value.to_bytes(2) + (len(http_response) + 1 + 16).to_bytes(2)
 
@@ -277,7 +277,7 @@ def main() -> None:
 
         http_response_record = record_header + http_response_encrypted + mac_tag
 
-        print(f"Sending a simple HTTP response with 'Hello, world' text...", end="\n\n")
+        print(f"Sending a simple HTTP response...", end="\n\n")
         client.send(http_response_record)
 
         exit(0)
