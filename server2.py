@@ -174,10 +174,37 @@ def parse(data: bytes, client):
     hash=sha384
   )
 
+  client_secret = hkdf_expand_label(
+    handshake_secret,
+    label=b"c hs traffic",
+    hash_value=hello_hash,
+    length=48,
+    hash=sha384
+  )
+
+  client_handshake_key = hkdf_expand_label(
+    client_secret,
+    label=b"key",
+    hash_value=b"",
+    length=32,
+    hash=sha384
+  )
+
+  client_handshake_iv = hkdf_expand_label(
+    client_secret,
+    label=b"iv",
+    hash_value=b"",
+    length=12,
+    hash=sha384
+  )
+
   print(f"Handshake secret     : {handshake_secret.hex()}")
   print(f"Server secret        : {server_secret.hex()}")
   print(f"Server handshake key : {server_handshake_key.hex()}")
   print(f"Server handshake IV  : {server_handshake_iv.hex()}")
+  print(f"Client secret        : {client_secret.hex()}")
+  print(f"Client handshake key : {client_handshake_key.hex()}")
+  print(f"Client handshake IV  : {client_handshake_iv.hex()}")
 
   server_change_cipher_spec = Record(
     RecordContentType.CHANGE_CIPHER_SPEC,
@@ -248,6 +275,8 @@ def parse(data: bytes, client):
   h = SHA256.new(hello_hash)
   signature = pss.new(cert_private_key).sign(h)
 
+  signature = bytes.fromhex("5cbb24c0409332daa920bbabbdb9bd50170be49cfbe0a4107fca6ffb1068e65f969e6de7d4f9e56038d67c69c031403a7a7c0bcc8683e65721a0c72cc6634019ad1d3ad265a812615ba36380372084f5daec7e63d3f4933f27227419a611034644dcdbc7be3e74ffac473faaadde8c2fc65f3265773e7e62de33861fa705d19c506e896c8d82f5bcf35fece259b71538115e9c8cfba62e49bb8474f58587b11b8ae317c633e9c76c791d466284ad9c4ff735a6d2e963b59bbca440a307091a1b4e46bcc7a2f9fb2f1c898ecb19918be4121d7e8ed04cd50c9a59e987980107bbbf299c232e7fdbe10a4cfdae5c891c96afdff94b54ccd2bc19d3cdaa6644859c")
+
   assert len(signature) == 256
 
   writer = ByteWriter()
@@ -306,7 +335,7 @@ def parse(data: bytes, client):
   writer.write_u8(HandshakeType.FINISHED)  # handshake type
   writer.write_u24(len(verify_data))
   writer.write_bytes(verify_data)
-  writer.write_u8(0x16)  # record type
+  #writer.write_u8(0x16)  # record type
   handshake_finished = writer.data
 
   cipher = AES.new(
@@ -314,8 +343,8 @@ def parse(data: bytes, client):
     AES.MODE_GCM,
     (int.from_bytes(server_handshake_iv, "big") ^ 3).to_bytes(12, "big")
   )
-  cipher.update(b"\x17\x03\x03" + (len(handshake_finished) + 16).to_bytes(2, "big"))
-  encrypted_data, mac_tag = cipher.encrypt_and_digest(handshake_finished)
+  cipher.update(b"\x17\x03\x03" + (len(handshake_finished) + 1 + 16).to_bytes(2, "big"))
+  encrypted_data, mac_tag = cipher.encrypt_and_digest(handshake_finished + b"\x16")
 
   server_application_data_4 = Record(
     RecordContentType.APPLICATION_DATA,
@@ -323,16 +352,69 @@ def parse(data: bytes, client):
     encrypted_data + mac_tag
   )
 
-  #print(server_application_data_4.to_bytes().hex())
+  # print(server_application_data_4.to_bytes().hex())
 
-  client.send(
-    server_hello_record.to_bytes() + \
-    server_change_cipher_spec.to_bytes() + \
-    server_application_data_1.to_bytes() + \
-    server_application_data_2.to_bytes() + \
-    server_application_data_3.to_bytes() + \
-    server_application_data_4.to_bytes()
+  # client.send(
+  #   server_hello_record.to_bytes() + \
+  #   server_change_cipher_spec.to_bytes() + \
+  #   server_application_data_1.to_bytes() + \
+  #   server_application_data_2.to_bytes() + \
+  #   server_application_data_3.to_bytes() + \
+  #   server_application_data_4.to_bytes()
+  # )
+
+  handshakes_hash = bytes.fromhex(sha384(
+    client_record.to_bytes()[5:] + \
+    server_hello_record.to_bytes()[5:] + \
+    extra_extensions + \
+    server_certificate + \
+    certificate_verify + \
+    handshake_finished
+  ).hexdigest())
+
+  empty_hash = bytes.fromhex(sha384("".encode()).hexdigest())
+  zero_key = bytes.fromhex("0" * 96)
+  derived_secret = hkdf_expand_label(handshake_secret, label="derived".encode(), hash_value=empty_hash, length=48, hash=sha384)
+  master_secret = hkdf_extract(derived_secret, zero_key, hash=sha384)
+  client_secret = hkdf_expand_label(master_secret, label="c ap traffic".encode(), hash_value=handshakes_hash, length=48, hash=sha384)
+  server_secret = hkdf_expand_label(master_secret, label="s ap traffic".encode(), hash_value=handshakes_hash, length=48, hash=sha384)
+  client_application_key = hkdf_expand_label(client_secret, label="key".encode(), hash_value="".encode(), length=32, hash=sha384)
+  server_application_key = hkdf_expand_label(server_secret, label="key".encode(), hash_value="".encode(), length=32, hash=sha384)
+  client_application_iv = hkdf_expand_label(client_secret, label="iv".encode(), hash_value="".encode(), length=12, hash=sha384)
+  server_application_iv = hkdf_expand_label(server_secret, label="iv".encode(), hash_value="".encode(), length=12, hash=sha384)
+
+  print(f"handshakes_hash        : {handshakes_hash.hex()}")
+  print(f"server_application_key : {server_application_key.hex()}")
+  print(f"server_application_iv  : {server_application_iv.hex()}")
+  print(f"client_application_key : {client_application_key.hex()}")
+  print(f"client_application_iv  : {client_application_iv.hex()}")
+  print()
+
+  data = bytes.fromhex("14030300010117030300459ff9b063175177322a46dd9896f3c3bb820ab51743ebc25fdadd53454b73deb54cc7248d411a18bccf657a960824e9a19364837c350a69a88d4bf635c85eb874aebc9dfde8")
+
+  record = Record.from_bytes(data[6:])
+
+  encrypted_data = record.data[:-16]
+  auth_tag = record.data[-16:]
+
+  cipher = AES.new(
+    client_handshake_key,
+    AES.MODE_GCM,
+    (int.from_bytes(client_handshake_iv, "big") ^ 0).to_bytes(12, "big")
   )
+  cipher.update(record.to_bytes()[:5])
+
+  try:
+    message = cipher.decrypt_and_verify(encrypted_data, auth_tag)
+    print(message.hex())
+  except ValueError:
+    print("The message was modified!")
+    return
+
+
+  #data = client.recv(16 * 1024)
+
+  #print(data)
 
 
 def main2() -> None:
@@ -367,6 +449,6 @@ def main() -> None:
       parse(data, client)
 
 if __name__ == "__main__":
-  main()
-  #main2()
+  #main()
+  main2()
 
