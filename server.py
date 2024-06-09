@@ -98,8 +98,8 @@ def main() -> None:
           cipher_suites=[CipherSuite.TLS_AES_256_GCM_SHA384],
           compression_methods=[0],
           extensions=[
-            HandshakeExtension(type=HandshakeExtensionType.KEY_SHARE, data=server_pub_key_entry.to_bytes()),
-            HandshakeExtension(type=HandshakeExtensionType.SUPPORTED_VERSIONS, data=HandshakeVersion.TLS_1_3.to_bytes(2))
+            HandshakeExtension(type=HandshakeExtensionType.SUPPORTED_VERSIONS, data=HandshakeVersion.TLS_1_3.to_bytes(2)),
+            HandshakeExtension(type=HandshakeExtensionType.KEY_SHARE, data=server_pub_key_entry.to_bytes())
           ]
         )
 
@@ -188,8 +188,8 @@ def main() -> None:
 
         # wrapped record: server handshake finished
         finished_key = hkdf_expand_label(ssecret, label="finished".encode(), hash_value="".encode(), length=48, hash=sha384)
-        finished_hash = bytes.fromhex(sha384(record.data[5:] + server_hello_record.to_bytes()[5:] + encrypted_extensions_record[1:] + 
-                                             server_certificate_record[1:] + certificate_verify_record[1:]).hexdigest())
+        finished_hash = bytes.fromhex(sha384(record.to_bytes()[5:] + server_hello_record.to_bytes()[5:] + extra_extensions + 
+                                             server_certificate + certificate_verify).hexdigest())
         verify_data = bytes.fromhex(hmac.new(finished_key, finished_hash, sha384).hexdigest())
 
         server_handshake_finished = HandshakeType.FINISHED.value.to_bytes() + len(verify_data).to_bytes(3) + verify_data
