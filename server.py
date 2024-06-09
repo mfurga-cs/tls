@@ -175,7 +175,7 @@ def main() -> None:
         # wrapped record: certificate verify
         handshakes_hash = bytes.fromhex(sha384(record.to_bytes()[5:] + server_hello_record.to_bytes()[5:] + extra_extensions + server_certificate).hexdigest())
         cert_private_key = RSA.import_key(open("certs/key.pem", "rb").read())  # key.pem
-        h = SHA256.new(handshakes_hash)
+        h = SHA256.new(b'\x20' * 64 + "TLS 1.3, server CertificateVerify".encode() + b'\x00' + handshakes_hash)
         signature = pss.new(cert_private_key).sign(h)
 
         certificate_verify = HandshakeType.CERTIFICATE_VERIFY.value.to_bytes() + (2 + 2 + len(signature)).to_bytes(3)
