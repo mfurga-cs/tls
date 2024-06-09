@@ -6,8 +6,6 @@ from typing import List
 from cipher_suites import CipherSuite
 from utils import ByteReader, ByteWriter
 
-from x25519 import base_point_mult
-
 
 class HandshakeType(IntEnum):
   HELLO_REQUEST = 0x00
@@ -157,7 +155,6 @@ class KeyShareEntry:
   def __init__(self, group: int, key: bytes):
     self.group = group
     self.key = key
-    #self.pub_key = base_point_mult(key)
 
   @property
   def length(self):
@@ -191,7 +188,6 @@ class KeyShareEntry:
     s.append(f"Group : 0x{self.group:04x}")
     s.append(f"Length : {self.length}")
     s.append(f"Key : 0x{self.key[:8].hex()} ...")
-    #s.append(f"Public key : 0x{self.pub_key[:8].encode().hex()} ...")
     return "\t".join(s)
 
 
