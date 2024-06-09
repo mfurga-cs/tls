@@ -117,8 +117,11 @@ def main() -> None:
         empty_hash = bytes.fromhex(sha384("".encode()).hexdigest())
         derived_secret = hkdf_expand_label(early_secret, label="derived".encode(), hash_value=empty_hash, length=48, hash=sha384)
         handshake_secret = hkdf_extract(derived_secret, shared_secret, hash=sha384)
+        csecret = hkdf_expand_label(handshake_secret, label="c hs traffic".encode(), hash_value=handshakes_hash, length=48, hash=sha384)
         ssecret = hkdf_expand_label(handshake_secret, label="s hs traffic".encode(), hash_value=handshakes_hash, length=48, hash=sha384)
+        client_handshake_key = hkdf_expand_label(csecret, label="key".encode(), hash_value="".encode(), length=32, hash=sha384)
         server_handshake_key = hkdf_expand_label(ssecret, label="key".encode(), hash_value="".encode(), length=32, hash=sha384)
+        client_handshake_iv = hkdf_expand_label(csecret, label="iv".encode(), hash_value="".encode(), length=12, hash=sha384)
         server_handshake_iv = hkdf_expand_label(ssecret, label="iv".encode(), hash_value="".encode(), length=12, hash=sha384)
 
         # server change cipher spec
